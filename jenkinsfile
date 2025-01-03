@@ -1,0 +1,52 @@
+pipeline{
+    agent any
+    tools{
+        jdk 'jdk17'
+        nodejs 'NodeJs'
+    }
+    stages {
+        stage('clean workspace'){
+            steps{
+                cleanWs()
+            }
+        }
+        stage('Checkout from Git'){
+            steps{
+                git branch: 'main', url: 'https://github.com/curlsysolange/Youtube-deployment.git'
+            }
+        }
+        stage('Install Dependencies') {
+            steps {
+                sh "npm install"
+            }
+        }
+        stage("Docker Build & Push"){
+            steps{
+                script{
+                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
+                       sh "docker build -t youtube-clone ."
+                       sh "docker tag youtube-clone curlsysolange/youtube-clone:latest "
+                       sh "docker push curlsysolange/youtube-clone:latest "
+                       sh "docker "
+                    }
+                }
+            }
+        }
+        stage('Deploy to container'){
+            steps{
+                sh 'docker run -d --name youtube-clone -p 3000:3000 curlsysolange/youtube-clone:latest'
+            }
+        }
+     post {
+        success {
+            slackSend(channel: '#project', color: 'good', message: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) was successful.")
+        }
+        failure {
+            slackSend(channel: '#project', color: 'danger', message: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) failed.")
+        }
+        always {
+            echo 'Build finished, check Slack for notifications.'
+        } 
+        } 
+    }
+}
